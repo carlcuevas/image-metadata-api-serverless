@@ -1,0 +1,83 @@
+name: Deploy (SAM)
+
+on:
+  workflow_dispatch:
+    inputs:
+      stack_name:
+        description: 'CloudFormation stack name'
+        required: true
+        default: 'image-metadata-cuevas'
+      aws_region:
+        description: 'AWS region'
+        required: true
+        default: 'us-east-1'
+      table_name:
+        description: 'DynamoDB table name'
+        required: true
+        default: 'ImageMetadata'
+      bucket_base_name:
+        description: 'S3 bucket base name (must start with my-image-storage-bucket)'
+        required: true
+        default: 'my-image-storage-bucket-cuevas'
+      stage_name:
+        description: 'API stage name'
+        required: true
+        default: 'prod'
+      seed_sample:
+        description: 'Upload sample image to S3 after deploy? (true/false)'
+        required: true
+        default: 'true'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ github.event.inputs.aws_region }}
+
+      - name: Setup SAM
+        uses: aws-actions/setup-sam@v2
+
+      - name: SAM Build
+        run: sam build --use-container
+
+      - name: SAM Deploy
+        run: >
+          sam deploy
+          --stack-name ${{ github.event.inputs.stack_name }}
+          --parameter-overrides
+          TableName=${{ github.event.inputs.table_name }}
+          BucketBaseName=${{ github.event.inputs.bucket_base_name }}
+          StageName=${{ github.event.inputs.stage_name }}
+          --no-confirm-changeset
+          --resolve-s3
+          --capabilities CAPABILITY_IAM
+
+- name: Get API endpoint
+  if: ${{ github.event.inputs.seed_sample == 'true' }}
+  id: api
+  run: |
+    API=$(aws cloudformation describe-stacks --stack-name "${{ github.event.inputs.stack_name }}"             --query "Stacks[0].Outputs[?OutputKey=='ApiEndpoint'].OutputValue" --output text)
+    echo "api=$API" >> $GITHUB_OUTPUT
+
+- name: Seed sample image (optional)
+  if: ${{ github.event.inputs.seed_sample == 'true' }}
+  run: |
+    set -euo pipefail
+    API="${{ steps.api.outputs.api }}"
+    echo "API: $API"
+    RESP=$(curl -s -X POST "$API/upload")
+    PY='import sys,json; d=json.loads(sys.stdin.read()); print(d.get("upload_url","")); print(d.get("object_key",""))'
+    readarray -t arr < <(printf "%s" "$RESP" | python -c "$PY")
+    URL="${arr[0]}"
+    KEY="${arr[1]}"
+    echo "KEY=$KEY"
+    curl -s -X PUT -H "Content-Type: image/jpeg" --upload-file assets/sample.jpg "$URL" >/dev/null
+    echo "Seed OK"
