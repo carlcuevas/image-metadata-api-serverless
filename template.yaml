@@ -1,0 +1,123 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Image Metadata API - Serverless (SAM) - Carlos Cuevas
+
+Parameters:
+  TableName:
+    Type: String
+    Default: ImageMetadata
+  BucketBaseName:
+    Type: String
+    Default: my-image-storage-bucket-cuevas
+  StageName:
+    Type: String
+    Default: prod
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: python3.12
+    MemorySize: 256
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref TableName
+        BUCKET_NAME: !Sub "${BucketBaseName}-${AWS::AccountId}-${AWS::Region}"
+
+Resources:
+  ImageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${BucketBaseName}-${AWS::AccountId}-${AWS::Region}"
+      PublicAccessBlockConfiguration:
+        BlockPublicPolicy: true
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+
+  MetadataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableName
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: image_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: image_id
+          KeyType: HASH
+
+  S3FileEventFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: s3_file_event
+      CodeUri: src/s3_file_event/
+      Handler: app.handler
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref ImageBucket
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MetadataTable
+      Events:
+        S3Put:
+          Type: S3
+          Properties:
+            Bucket: !Ref ImageBucket
+            Events: s3:ObjectCreated:Put
+
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: get_image_metadata
+      CodeUri: src/get_image_metadata/
+      Handler: app.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MetadataTable
+        - S3CrudPolicy:
+            BucketName: !Ref ImageBucket
+      Events:
+        ApiRoot:
+          Type: Api
+          Properties:
+            RestApiId: !Ref RestApi
+            Path: /metadata
+            Method: GET
+        ApiById:
+          Type: Api
+          Properties:
+            RestApiId: !Ref RestApi
+            Path: /metadata/{image_id}
+            Method: GET
+        ApiDelete:
+          Type: Api
+          Properties:
+            RestApiId: !Ref RestApi
+            Path: /metadata/{image_id}
+            Method: DELETE
+        ApiUpload:
+          Type: Api
+          Properties:
+            RestApiId: !Ref RestApi
+            Path: /upload
+            Method: POST
+
+  RestApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: ImageMetadataAPI
+      StageName: !Ref StageName
+      Cors:
+        AllowMethods: "'GET,DELETE,POST,OPTIONS'"
+        AllowHeaders: "'*'"
+        AllowOrigin: "'*'"
+
+Outputs:
+  ApiEndpoint:
+    Description: Invoke URL base for the API stage
+    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}"
+  BucketName:
+    Value: !Ref ImageBucket
+  TableName:
+    Value: !Ref MetadataTable
