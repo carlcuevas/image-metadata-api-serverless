@@ -1,0 +1,52 @@
+{
+  "info": {
+    "name": "ImageMetadataAPI - Carlos Cuevas",
+    "_postman_id": "6f7e0c7f-3d2a-4b4b-97b7-cfc9b7b1c7f0",
+    "description": "Colecci\u00f3n de pruebas b\u00e1sicas",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Listar metadatos",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{api}}/metadata"
+      }
+    },
+    {
+      "name": "Obtener por id",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{api}}/metadata/{{image_id}}"
+      }
+    },
+    {
+      "name": "Eliminar por id",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{api}}/metadata/{{image_id}}"
+      }
+    },
+    {
+      "name": "Generar URL de subida",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{api}}/upload"
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "api",
+      "value": "https://<restid>.execute-api.<region>.amazonaws.com/prod"
+    },
+    {
+      "key": "image_id",
+      "value": "perrito.jpg"
+    }
+  ]
+}
