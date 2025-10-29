@@ -1,40 +1,53 @@
-# Image Metadata API — Carlos Cuevas
+Image Metadata API — Carlos Cuevas
+Bienvenido al repositorio de mi segundo proyecto de evaluación, donde armé una solución serverless en AWS para guardar y consultar metadatos de imágenes. El objetivo es que puedas subir imágenes, guardar sus datos y consultarlos desde una API, todo sin infraestructura física.
 
-Infra serverless mínima: **S3 + DynamoDB + 2 Lambdas + API Gateway (REST)**.
+¿Qué tecnologías y servicios utilicé?
+S3 para guardar las imágenes que subas.
 
-- Bucket S3 (nombre base debe partir con **my-image-storage-bucket**).
-- Tabla DynamoDB **ImageMetadata** (PK: `image_id`).
-- Lambdas: **s3_file_event** (trigger S3 Put) y **get_image_metadata** (API).
-- API REST `ImageMetadataAPI` con: `GET /metadata`, `GET /metadata/{image_id}`, `DELETE /metadata/{image_id}`, `POST /upload`.
+DynamoDB para almacenar los metadatos y así tener consultas rápidas.
 
-## Despliegue (GitHub Actions)
-1. Agrega *Secrets* en el repo:
-   - `AWS_ACCESS_KEY_ID`
-   - `AWS_SECRET_ACCESS_KEY`
-2. Actions → **Deploy (SAM)** → Run workflow.
-   - `bucket_base_name`: por defecto `my-image-storage-bucket-cuevas`.
-   - El endpoint aparece en **CloudFormation → Outputs → ApiEndpoint**.
+Lambda:
 
-## Pruebas
-Ver **postman/ImageMetadataAPI.postman_collection.json** o usa `scripts/demo.sh`.
+Una función se activa sola cuando subes una imagen al bucket (detector de eventos).
 
-## Monitoreo y rendimiento
-En **docs/CloudWatch.md** hay notas de logs, métricas (Invocations/Errors) y ajustes de performance (memoria, tiempo de ejecución, concurrencia).
+La otra responde a llamados de la API para consultar o modificar metadatos.
 
-## Estructura
-```
-template.yaml
+API Gateway para exponer todo como endpoints REST, así puedes interactuar desde Postman, scripts o cualquier frontend.
+
+¿Cómo se despliega esto?
+El repositorio está listo para integraciones continuas usando GitHub Actions.
+
+Si quieres desplegarlo tú mismo, primero ve a la sección "Secrets" de GitHub y agrega tus credenciales de AWS:
+
+AWS_ACCESS_KEY_ID
+
+AWS_SECRET_ACCESS_KEY
+
+Corre el workflow llamado "Deploy (SAM)".
+
+El bucket se crea automáticamente y se llama (por defecto) my-image-storage-bucket-cuevas.
+
+Cuando termina, en CloudFormation te aparecerá el endpoint para llamar a la API.
+
+¿Cómo lo pruebo o demuestro?
+Tengo una colección de Postman (postman/ImageMetadataAPI.postman_collection.json) que te ayuda a probar todos los endpoints.
+
+Si prefieres la terminal, hay un script llamado demo.sh que resuelve los llamados de ejemplo y muestra los resultados.
+
+¿Y cómo monitoreo que todo está funcionando?
+Revisando CloudWatch.md tienes las instrucciones para monitorear logs, errores y todas las métricas importantes. Te explico allí cómo ajustar memoria, tiempo de ejecución y cómo ver si las Lambdas están funcionando bien.
+
+Estructura de archivos y carpetas
+Aquí va la organización del repo para que no te pierdas:
+
+text
+template.yaml                  # Infraestructura serverless como código
 src/
-  get_image_metadata/app.py
-  s3_file_event/app.py
-.github/workflows/deploy.yml
-postman/ImageMetadataAPI.postman_collection.json
-scripts/demo.sh
+  get_image_metadata/app.py    # Código de Lambda de consulta
+  s3_file_event/app.py         # Código de Lambda de eventos S3
+.github/workflows/deploy.yml   # Pipeline de CI/CD
+postman/...
+scripts/...
 docs/CloudWatch.md
-```
-
-
-## Datos de prueba
-- Incluye **assets/sample.jpg** (esta imagen) para sembrar un item de ejemplo automáticamente:
-  - En el workflow, deja `seed_sample: true` y tras el deploy se sube a S3 usando **POST /upload** → **PUT** al URL prefirmado.
-  - Puedes cambiarla o borrarla si prefieres.
+Datos para probar
+Incluyo una imagen de ejemplo (assets/sample.jpg) para que, apenas despliegues el proyecto, puedas probar el flujo completo. Si activas la opción seed_sample: true, esa imagen se sube sola y ya tienes datos para consultar sin hacer nada manual.
