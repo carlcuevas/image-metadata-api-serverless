@@ -60,24 +60,24 @@ jobs:
           --resolve-s3
           --capabilities CAPABILITY_IAM
 
-- name: Get API endpoint
-  if: ${{ github.event.inputs.seed_sample == 'true' }}
-  id: api
-  run: |
-    API=$(aws cloudformation describe-stacks --stack-name "${{ github.event.inputs.stack_name }}"             --query "Stacks[0].Outputs[?OutputKey=='ApiEndpoint'].OutputValue" --output text)
-    echo "api=$API" >> $GITHUB_OUTPUT
+      - name: Get API endpoint
+        if: ${{ github.event.inputs.seed_sample == 'true' }}
+        id: api
+        run: |
+          API=$(aws cloudformation describe-stacks --stack-name "${{ github.event.inputs.stack_name }}"             --query "Stacks[0].Outputs[?OutputKey=='ApiEndpoint'].OutputValue" --output text)
+          echo "api=$API" >> $GITHUB_OUTPUT
 
-- name: Seed sample image (optional)
-  if: ${{ github.event.inputs.seed_sample == 'true' }}
-  run: |
-    set -euo pipefail
-    API="${{ steps.api.outputs.api }}"
-    echo "API: $API"
-    RESP=$(curl -s -X POST "$API/upload")
-    PY='import sys,json; d=json.loads(sys.stdin.read()); print(d.get("upload_url","")); print(d.get("object_key",""))'
-    readarray -t arr < <(printf "%s" "$RESP" | python -c "$PY")
-    URL="${arr[0]}"
-    KEY="${arr[1]}"
-    echo "KEY=$KEY"
-    curl -s -X PUT -H "Content-Type: image/jpeg" --upload-file assets/sample.jpg "$URL" >/dev/null
-    echo "Seed OK"
+      - name: Seed sample image (optional)
+        if: ${{ github.event.inputs.seed_sample == 'true' }}
+        run: |
+          set -euo pipefail
+          API="${{ steps.api.outputs.api }}"
+          echo "API: $API"
+          RESP=$(curl -s -X POST "$API/upload")
+          PY='import sys,json; d=json.loads(sys.stdin.read()); print(d.get("upload_url","")); print(d.get("object_key",""))'
+          readarray -t arr < <(printf "%s" "$RESP" | python -c "$PY")
+          URL="${arr[0]}"
+          KEY="${arr[1]}"
+          echo "KEY=$KEY"
+          curl -s -X PUT -H "Content-Type: image/jpeg" --upload-file assets/sample.jpg "$URL" >/dev/null
+          echo "Seed OK"
